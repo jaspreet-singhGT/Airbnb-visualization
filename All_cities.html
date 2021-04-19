@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+	<!-- add title -->
+    <title>Salem Airbnb Analysis</title>
+	
+    <!-- import required libraries here -->
+
+    <script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-dsv.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-geo-projection.v2.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-tip.min.js"></script>
+    
+	
+	<style>
+		/* define CSS rules here */
+
+        text {
+            fill: #000;
+            font: 12px sans-serif;
+            pointer-events: none;
+            }
+
+        .boundries {
+            fill: black;
+            stroke: black;
+            stroke-width: 0.5;
+        }
+        /* Creates a small triangle extender for the tooltip */
+        .infocenter {
+                    fill:black;
+                    border-radius: 2px;
+                    
+                    }
+        .infocenterText{
+                    font-size: 15px;
+                    font-weight: bold;                    
+                    line-height: 1;
+                    fill: #fff;
+                    }
+
+
+
+        .d3-tip {
+                line-height: 1;
+                font-weight: bold;
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.8);
+                color: #fff;
+                border-radius: 2px;
+                }
+
+        /* Creates a small triangle extender for the tooltip */
+        .d3-tip:after {
+        box-sizing: border-box;
+        display: inline;
+        font-size: 15px;
+        width: 100%;
+        line-height: 1;
+        color: rgba(0, 0, 0, 0.8);
+        content: "\25BC";
+        position: absolute;
+        text-align: center;
+        }
+
+        /* Style northward tooltips differently */
+        .d3-tip.n:after {
+        margin: -1px 0 0 0;
+        top: 100%;
+        left: 0;
+        }
+/* 
+    .circles {
+        fill: #3c373d;
+    }
+
+    .labels {
+        font-family: sans-serif;
+        font-size: 11px;
+        fill: #3c373d;
+    } */
+	
+	</style>
+</head>
+
+
+<body>
+    <!-- Add heading for the visualization -->
+	<h1>Insight's for Airbnb Hosts</h1>
+	<!-- Create dropdown element here. Options should be added after reading in game file, they should not be created here.-->
+	
+    <table style="width: 900">
+        <tr>
+            <td>
+                <h2>
+                    <p>Prioritize by: <select id='selectButton'>
+                                    <option value = "avgprice">Average Price</option>
+                                    <option value = "rev_pm">Reviews per month</option>
+                                    <option value = "numberoflisting">Number of Listings</option>
+                                    <option value = "Revenue_opp_pm">Revenue Opportunity pm</option>           
+                                    </select></p>
+                </h2>
+            </td>
+            <td></td>
+            <td>
+                <h2>
+                    <p>Select City: <select id='selectCity'>                        
+                        <option value = "Salem">Salem</option>
+                        <option value = "NYC">New York City</option>          
+                        </select></p> 
+                </h2>
+            </td>
+
+        </tr>
+            
+    
+    </table>
+	<!-- append visualization svg to this div-->
+    <table>
+        <tr>
+            <td>
+                <div id="choropleth"></div>
+            </td>
+            <td>
+                <div id="infobuletin"></div>
+            </td>
+            <td style="width:100">
+
+            </td>
+        </tr>
+    </table>
+    
+
+    <script>
+	
+		// enter code to define margin and dimensions for svg
+		var w = 950;
+        var h = 550;
+        var path
+        var map 
+        var airbnb
+
+        var mapdata
+        var zipCount
+
+        // Experiment
+        const width = 400;
+        const height = 100;
+        const margin = 12;
+        const padding = 5;
+        const adj = 75;
+
+		// enter code to create svg
+        var svg = d3.select("div#choropleth") .append("svg") //.attr("preserveAspectRatio", "xMinYMin meet")
+                    .attr("width", w)
+                    .attr("height", h)
+                    //.attr("viewBox", "0 0 " + w + " " + h)
+                    .style("background","lightgrey")
+                    .classed("svg-content", true);
+                    
+                    
+        // Legends Headings
+        svg.append("text")
+                .attr("class","heading")
+                .attr("x",w-200)
+                .attr("y", (30))
+                .style("font-weight","bold")
+
+            // Setting up info center to display information 
+            infoContainer = svg.append("g")
+                                .attr("class","infocenter")
+            
+            // Adding a rectangle for displaying infocenter
+                infoContainer.append("rect")
+                                    .attr("class","infocenter")
+                                    .attr("y",20 )
+                                    .attr("x",20)
+                                    .attr("width", "300")
+                                    .attr("height","110" )
+                                    
+
+            // Adding a text labels for infocenter
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("y",40 ).attr("x",30)
+                                    .text("Neighbourhood group:")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("id", "ngValue" )
+                                    .attr("y",40 ).attr("x",200)
+                                    .text("Bronx")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("y",60 ).attr("x",30)
+                                    .text("Neighbourhood:")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("id", "nValue" )
+                                    .attr("y",60 ).attr("x",200)
+                                    .text("Working on it")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("y",80 ).attr("x",30)
+                                    .text("Total Listings:")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("id", "listValue" )
+                                    .attr("y",80 ).attr("x",200)
+                                    .text("Working on it")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("y",100 ).attr("x",30)
+                                    .text("Monthly Bookings:")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("id", "mbValue" )
+                                    .attr("y",100 ).attr("x",200)
+                                    .text("Working on it")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("y",120 ).attr("x",30)
+                                    .text("Avg Price:")
+                infoContainer.append("text")
+                                    .attr("class","infocenterText")
+                                    .attr("id", "pValue" )
+                                    .attr("y",120 ).attr("x",200)
+                                    .text("Working on it")   
+        
+        // Adding SVG element for bar charts and info display
+        svg2 =d3.select("div#infobuletin") 
+                    .append("svg") //.attr("preserveAspectRatio", "xMinYMin meet")
+                    .attr("width", (width+adj+adj))
+                    .attr("height", h)
+                    .classed("svg-content", true)
+                    .attr("y","0")
+                    .attr("x",(w+10));
+            
+        svg2.append("text")
+                        .attr("transform", "translate("+(adj+width/2)+", "+(h-padding) +")")
+                        .style("text-anchor", "middle")
+                        .style("fill","black")
+                        .style("font-size","15px")
+                        .style("font-weight","bold")
+                        .text("Number of Bookings received in a year")  
+
+        
+        // svg2 = d3.select("div#choropleth").append("svg")
+        //       .attr("id","bar_chart_svg")
+        //         // .attr("preserveAspectRatio", "xMinYMin meet")
+        //         .attr("viewBox", "-"
+        //             + adj*2.5 + " -"
+        //             + adj + " "
+        //             + (width + adj*5) + " "
+        //             + ((height/2)+ adj*2))
+        //         .style("padding", padding)
+        //         .style("margin", margin)
+        //         .style("background","lightgrey" )
+        //         .classed("svg-content", true)
+        //         .attr("visibility","hidden")
+        //         ;            
+        // Check for the selection of the city and load the data accordingly
+        Setup_Map((d3.select("#selectCity").node().value))
+        d3.select("#selectCity")
+                .on("change",function(d){           
+                                        Setup_Map((d3.select("#selectCity").node().value))
+                                        })
+        
+//Loading Map and csv Data for that city
+function Setup_Map(city)
+{ 
+            // console.log("Setting up Map:"+city)
+            map = d3.json("neighbourhoods_"+city+ ".geojson");
+            airbnb = d3.csv("Airbnb_"+city+ ".csv");          
+            dataset = d3.csv("Airbnb_"+city+"_large.csv");
+        
+
+             
+        
+		//Create color scale
+        ColorQuantile = d3.scaleQuantile()
+                            .range(["#ffffcc","#a1dab4","#41b6c4","#225ea8"])
+		
+        Promise.all([
+            		map, airbnb, dataset
+        ]).then(
+                function(d){ready(null,d[0],d[1],d[2])}
+			
+        );
+		
+      	
+        function ready(error, mapData, airbnb, airbnb_large) {
+             
+            mapdata = mapData
+            zipCount = airbnb
+            large = airbnb_large
+            var scale  = 130000;
+            var center = d3.geoCentroid(mapData)
+            if (city=="NYC") {
+
+                scale = 50000;
+                
+            }
+            
+            var offset = [w/2, h/2];
+            var projection = d3.geoMercator().scale(scale).center(center).translate(offset);
+
+           
+            path = d3.geoPath().projection(projection);
+            final_map =     svg.selectAll("path").data(mapdata.features);
+             
+            // Setting up things for Map
+            final_map.enter()
+                    .append("path")
+                    .attr("class","boundries")
+                    .attr("d", path)
+                    .attr("id","mappath") 
+
+            // event listner on change of options of Priority
+            d3.select("#selectButton")
+                .on("change",function(d){
+                                            createMapAndLegend(mapData,airbnb,(d3.select("#selectButton").node().value)) 
+                                        })
+            
+            
+                    
+            
+
+            // Setting up the MAP and legends
+            createMapAndLegend(mapData,airbnb,d3.select("#selectButton").node().value)
+
+        }
+
+    }
+		var createdata
+
+        // This function is called on changing the selection of dropdowm for Prioritize by
+        function createMapAndLegend(mapData, airbnb, selected){ 
+                // console.log("I am here in createMAP")
+                listing_counts = airbnb.map(function(d){return +d[selected]}).sort(d3.ascending)
+                // Setting up the domain for the color
+                ColorQuantile.domain(listing_counts) 
+                
+                // // Removing the old MAP
+                svg.selectAll("path")
+                    .remove();
+
+                // Resetting the Map when data is changed
+                mappp = svg.append("g")
+                .attr("class", "boundries")
+                .selectAll("path")
+                .data(mapData.features)
+
+                mappp.enter().append("path").attr("id","mappath") .merge(mappp)
+                .attr("fill", function(d) { var temp_r = airbnb.filter(function(f){return f.neighbourhood_cleansed ==d.properties.neighbourhood} )
+                                                                .map(function(e){return e[selected]})[0];
+                                                if(typeof temp_r==="undefined"){
+
+                                                    temp_r = 0;
+                                                    }
+                                                
+
+                                                return ColorQuantile(temp_r);
+                                               
+                    
+                                                    })
+                .attr("d", path)
+                .on('mouseover', function(d){
+                                    setupInfoCenter(d, airbnb,"visible" )
+                                    })
+                .on('mouseout', function(d){
+                                    setupDefault(d,"hidden" )
+                                    })
+                .on('click',function(d){
+                            create_barcharts( d, large,  "Superhost" , width, 90, 20, 100,-45)
+                            create_barcharts( d, large,  "Room_Type" , width, 90, 150, 100,-45)
+                            create_barcharts( d, large,  "Bathrooms" , width, 90, 280, 100,0)
+                            create_barcharts( d, large,  "Bedrooms" , width, 90, 410, 100,0)
+                })
+                
+                mappp.
+                exit().remove()
+
+
+                // Creating and Updating Legend
+                quartile=[]
+                for(i=0;i<=1;i=i+0.25){
+                    quartile.push(d3.format(",.0f")(d3.quantile(listing_counts,i)));
+                    
+                }
+                createdata = quartile
+                bar = svg.selectAll("g.legend")
+                .data(quartile.slice(0,4))
+
+                bar.enter().append("g").attr("class","legend")
+                .append("rect")
+                .attr("x", w-200)
+                .attr("y", function(d,i){return (50+i*25)} )
+                .attr("height", 20)
+                .attr("width", 20)
+                .attr("style",function(d){ return ("fill:" + ColorQuantile((+d+1)))})
+                
+                
+                txt = svg.selectAll("text.range").data(quartile.slice(0,4))
+
+                txt.enter().append("g")//.merge(txt)
+                .append("text")
+                .attr("class","range")
+                .attr("x", w-170)
+                .attr("y", function(d,i){return (65+i*25)} )
+                .text(function(d,i){return((quartile[i])+ " to " + (quartile[i+1]))})
+                .attr("style","fill: black")
+
+                txt.transition()//.merge(txt)
+                .text(function(d,i){return((quartile[i])+ " to " + (quartile[i+1]))})
+                .attr("style","fill: black")
+
+                // Header for Legends
+                d3.select("text.heading")
+                        .text((d3.select("#selectButton option:checked").text()))  
+        }
+    
+    function setupInfoCenter(mapFeatures,airbnb, visibility)
+    {
+                    d3.select("#ngValue").text(mapFeatures.properties["neighbourhood_group"])
+                    d3.select("#nValue").text(mapFeatures.properties["neighbourhood"])
+
+                    var temp_r = airbnb.filter(function(f){return f.neighbourhood_cleansed ==mapFeatures.properties.neighbourhood})
+                    if(temp_r.length ===0)
+                    {
+                            d3.select("#listValue").text("NA")
+                            d3.select("#mbValue").text("NA")
+                            d3.select("#pValue").text("NA")
+                    }
+                    else{
+                            d3.select("#listValue").text(temp_r.map(function(e){return e.numberoflisting})[0])
+                            d3.select("#mbValue").text(temp_r.map(function(e){return d3.format(",.0f")(e.rev_pm/0.5)})[0])
+                            d3.select("#pValue").text(temp_r.map(function(e){return d3.format(",.0f")(e.avgprice)})[0])
+                    }
+
+            // Highlighting the path that is selected
+            d3.selectAll("#mappath").filter(function(d)
+                                                {
+                                                    return d.properties.neighbourhood ==mapFeatures.properties.neighbourhood
+                                                }).style("stroke-Width","3px") 
+
+
+    }
+
+    function setupDefault(mapFeatures, visibility)
+    {
+            // Highlighting the path that is selected
+            d3.selectAll("#mappath").filter(function(d)
+                                                {
+                                                    return d.properties.neighbourhood ==mapFeatures.properties.neighbourhood
+                                                }).style("stroke-Width","1px") 
+
+
+    }
+
+    // Create Bar chart for anything you want
+    function create_barcharts(mapdata, chartdata, groupby ,chartwidth, xposition, yposition, height, rotateLabel)
+    {
+            
+            height_bar = height
+            
+
+            filtered_data = large.filter(function(d){return d.neighbourhood_group_cleansed == mapdata.properties.neighbourhood_group && d.neighbourhood_cleansed == mapdata.properties.neighbourhood})
+
+            nested_data = d3.nest()
+                        .key(function(d){return d[groupby]}).sortKeys(d3.ascending)
+                        // .key(function(d){return Math.floor(d.average_rating)}).sortKeys(d3.ascending)
+                        .rollup(function(leaves){return leaves.length})
+                        .entries(filtered_data)
+
+            nested_data = nested_data.filter(function(d){return d.key!=0 }).sort(function(a,b){return +b.value - +a.value} ).slice(0,5)
+
+            nested_data = nested_data.sort(function(a,b){return +a.value - +b.value} )
+
+
+            
+            ///////////// ENTER SECTION ////////////////////
+
+
+            //----------------------------SCALES----------------------------//
+            // height_bar = height
+          
+            xScaleb = d3.scaleLinear().range([0,chartwidth]);
+            yScaleb = d3.scaleBand().range([height_bar,0]);
+                
+           //Update Scale Domain for X Axis and Y Axis
+            xScaleb.domain([0, d3.max(nested_data, function(d){return (+d.value)})
+                                        ]);
+                
+            yScaleb.domain(nested_data.map(function(d){return d.key}))
+
+            //-----------------------------AXES-----------------------------//
+            yaxisb = d3.axisLeft()
+                    .ticks(5)
+                    .scale(yScaleb);
+                
+            xaxisb = d3.axisBottom()
+                    .ticks(5)
+                    .scale(xScaleb)
+                    .tickSize(-height_bar)
+            
+                    
+                
+            
+            //-------------------------2. DRAWING---------------------------//
+                //-----------------------------AXES-----------------------------//
+                // Graph 1")
+                if(!d3.select("#xaxis"+groupby).node())
+                {
+                    svg2.append("g")
+                        .attr("id","xaxis"+groupby)
+                        .attr("transform", "translate("+ xposition +"," +(yposition+ height_bar) + ")")
+                        .call(xaxisb)
+                                         
+                    
+                    
+                    
+
+                if(rotateLabel==0){
+                        //Update Y axis
+                        svg2.append("g")
+                        .attr("id","yaxis"+groupby)
+                        .attr("transform", "translate("+ xposition +"," + yposition + ")")
+                        .call(yaxisb)
+                        .selectAll("text")
+                        // .attr("transform", "rotate("+rotateLabel+")")
+                        .style("text-anchor","end");
+
+                        }
+                    else
+                        {
+                         //Update Y axis
+                         svg2.append("g")
+                            .attr("id","yaxis"+groupby)
+                            .attr("transform", "translate("+ xposition +"," + yposition + ")")
+                            .call(yaxisb)
+                            .selectAll("text")
+                            .attr("y", -10)
+                            .attr("x", -10)
+                            .attr("transform", "rotate("+rotateLabel+")")
+                            .style("text-anchor","end");
+                        }
+
+                    svg2.append("text")
+                        .attr("class","charttitle")
+                        .attr("transform", "translate("+margin+","+(yposition+(height_bar/2))+")rotate(-90)")        
+                        .style("text-anchor", "middle")
+                        .style("font-size","15px")
+                        .style("font-weight","bold")
+                        .text(groupby)
+                        d3.selectAll("#xaxis"+groupby+" g.tick")
+                        .style("opacity","0.5")
+                }
+                else
+                {
+                    //Update X axis
+                    svg2.select("#xaxis"+groupby)
+                        .transition()
+                        .duration(1000)
+                        .call(xaxisb);
+                               
+                if(rotateLabel==0){
+                        //Update Y axis
+                        svg2.select("#yaxis"+groupby)
+                        .transition()
+                        .duration(1000)
+                        .call(yaxisb)
+                        .selectAll("text")
+                        // .attr("transform", "rotate("+rotateLabel+")")
+                        .style("text-anchor","end");
+
+                    }
+                    else
+                    {
+                         //Update Y axis
+                    svg2.select("#yaxis"+groupby)
+                        .transition()
+                        .duration(1000)
+                        .call(yaxisb)
+                        .selectAll("text")
+                        .attr("y", -10)
+                        .attr("x", -10)
+                        .attr("transform", "rotate("+rotateLabel+")")
+                        .style("text-anchor","end");
+                    }
+                       
+
+                    d3.selectAll("#xaxis"+groupby+" g.tick")
+                        .style("opacity","0.5")
+                    // d3.selectAll("#yaxis"+groupby+" g.tick")
+                    // .attr("transform", "rotate(-40)")
+
+                    // svg2.select(".charttitle")
+                    //     .data(updated_bar_data)
+                    //     .attr("transform", "translate("+(width/2)+","+-20+")")        
+                    //     .style("text-anchor", "middle")
+                    //     .style("font-size","20px")
+                    //     .style("font-weight","bold")
+                    //     .text(function(d){return "Top 5 most rated games for year " + d.year + " with rating " + Math.floor(d.average_rating)})
+                }        
+                    bar = svg2.selectAll("rect"+"#"+groupby)
+                            .data(nested_data)        
+                            ;
+                        
+                    bar.enter().append("g").append("rect").attr("id",groupby)
+                            .attr("x", xposition)
+                            .attr("y", function(d,i){return yScaleb(d.key) + yposition } )
+                            .attr("height", (height*0.9/(nested_data.length)))
+                            .attr("width", function(d){return xScaleb(d.value)})
+                            // .style("stroke", function(d){return colorScale(d.key)})
+                            // .style("stroke-width","2")
+                            .attr("style","fill: blue; opacity:0.5")
+
+                    
+                        bar.transition()
+                        .duration(1000)
+                        .attr("x",xposition)
+                        .attr("y", function(d){return yScaleb(d.key) + yposition })
+                        .attr("height", (height*0.9/(nested_data.length)))
+                            .attr("width", function(d){return xScaleb(d.value)})
+                            // .style("stroke", function(d){return colorScale(d.key)})
+                            // .style("stroke-width","2")
+                            .attr("style","fill: blue; opacity:0.7")
+
+                        svg2.selectAll("rect"+"#"+groupby)
+                            .data(nested_data)
+                            .exit()
+                            .remove();
+                
+                
+
+
+    }
+
+    </script>
+
+</body>
+
+</html>
